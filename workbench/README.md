@@ -46,3 +46,9 @@ Open the generated HTML in Chromium. Its bundled compiler runs offline. Add
 `--online` to produce the smaller GPU Lab page, which downloads the same pinned
 compiler assets on the first run. Compiler diagnostics and the learner's source
 stay in the browser.
+
+## Lenovo tablet check
+
+The offline starter kernel compiled and ran on a physical Lenovo tablet. For
+inputs 1 through 5, the page displayed `[2, 4, 6, 8, 10]`. Separate Chromium
+browser tests verified edited kernels and compiler diagnostics.
