@@ -74,12 +74,13 @@ pre{border:1px solid var(--line);border-radius:6px;padding:10px;background:var(-
 <thead><tr><th scope="col">Index</th><th scope="col">Input</th><th scope="col">Output</th></tr></thead>
 <tbody id="values"></tbody>
 </table>
+<pre id="program-output" hidden aria-label="Program output" aria-live="polite"></pre>
+<details id="program-operations" hidden><summary>Trace CUDA calls</summary><pre></pre></details>
 <details id="ptx-panel" hidden><summary>Inspect generated PTX</summary><pre id="ptx"></pre></details>
 </section>
 </div>
-<details>
-<summary>Supported edits and software licences</summary>
-<p class="note">Keep the kernel signature. Clang compiles the editor text. A lesson-specific generator lowers the supported LLVM IR to PTX for functional execution in GPGPU-Sim. Try FP32 addition, subtraction and multiplication, or change the bounds check. Edits that require other LLVM instructions show a diagnostic. The launch and input arrays are supplied by the lesson. Results report simulated values.</p>
+<details id="software-licences">
+<summary>Software licences</summary>
 <pre>__LICENSES__</pre>
 </details>
 </main>

@@ -9,7 +9,15 @@ const ptxPanel = document.querySelector('#ptx-panel');
 const ptx = document.querySelector('#ptx');
 const mode = document.documentElement.dataset.inline || new URLSearchParams(location.search).get('embed');
 const profile = mode === 'hello' ? 'hello' : undefined;
-if (profile) {
+const fullProgram = document.documentElement.dataset.program === 'true';
+const consoleOutput = document.querySelector('#program-output');
+const operations = document.querySelector('#program-operations');
+if (fullProgram) {
+  editor.value = profile ? lab.firstProgram : lab.arrayProgram;
+  document.querySelector('#output-title + p').textContent = 'Output from main() in this browser.';
+  values.closest('table').hidden = true;
+  consoleOutput.hidden = false;
+} else if (profile) {
   editor.value = lab.firstKernel;
   document.querySelector('#output-title + p').textContent = 'One block, one thread, one output value.';
   const table = values.closest('table');
@@ -18,7 +26,7 @@ if (profile) {
 }
 const starter = editor.value;
 const storageKey = 'gpu-lab-v2:editable-cuda-kernel' +
-  (['hello', 'scale', 'bounds'].includes(mode) ? mode : '');
+  (['hello', 'scale', 'bounds', 'copies'].includes(mode) ? mode : '') + (fullProgram ? ':program' : '');
 let engine;
 let workerUrl;
 let prepared = false;
@@ -45,6 +53,8 @@ function showValues(output) {
 
 function clearResult(message) {
   showValues();
+  consoleOutput.textContent = '';
+  operations.hidden = true;
   ptx.textContent = '';
   ptxPanel.hidden = true;
   diagnostics.textContent = '';
@@ -99,10 +109,18 @@ function launchWorker() {
       fail('The run did not complete.', data.error);
       return;
     }
-    showValues(data.output);
-    ptx.textContent = data.ptx;
-    ptxPanel.hidden = false;
-    status.textContent = 'Compiled and ran in GPGPU-Sim.';
+    if (fullProgram) {
+      consoleOutput.textContent = data.stdout || 'No console output.';
+      operations.querySelector('pre').textContent = data.events.join('\n');
+      operations.hidden = !data.events.length;
+      status.textContent = data.exitCode ? 'main() returned ' + data.exitCode + '.' :
+        data.ptx ? 'Ran main() and the kernel in GPGPU-Sim.' : 'Ran main(). No kernel was launched.';
+    } else {
+      showValues(data.output);
+      status.textContent = 'Compiled and ran in GPGPU-Sim.';
+    }
+    ptx.textContent = data.ptx || '';
+    ptxPanel.hidden = !data.ptx;
     diagnostics.textContent = data.diagnostics;
     diagnostics.hidden = !data.diagnostics;
     busy(false);
@@ -123,7 +141,7 @@ run.addEventListener('click', () => {
       shutDown();
       fail('The run timed out.');
     }, 90_000);
-    engine.postMessage({ source: editor.value, profile, assets: prepared ? undefined : lab.assets });
+    engine.postMessage({ source: editor.value, profile, fullProgram, assets: prepared ? undefined : lab.assets });
   } catch (error) {
     shutDown();
     fail('The compiler could not start.', String(error.message ?? error));

@@ -1,5 +1,15 @@
 # Editable CUDA workbench
 
+The course can enable full-program mode by setting `data-program="true"` on the
+workbench document. Clang compiles the same source for the Wasm host and the
+CUDA device. The worker binds the host CUDA calls to FP32 device buffers and
+a bounded one-dimensional GPGPU-Sim launch. It reports the output from
+`main()` and the actual allocation, copy and launch calls.
+
+`first-program.cu` and `program.cu` are the full-program starters. Run
+`check.mjs` to verify that editing the host input and launch changes the
+simulated execution, and that edits to the kernel and host output take effect.
+
 Use `?embed=hello` to open the one-thread introduction. The editor compiles
 `__global__ void hello(float* output)`, and the runner launches one block with
 one thread and copies back one float. `first-kernel.cu` supplies the editable

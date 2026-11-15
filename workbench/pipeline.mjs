@@ -4,7 +4,7 @@ const clangCommand = [
   '--cuda-gpu-arch=sm_70 -nocudainc -nocudalib -resource-dir /lib/clang/23',
   '-include /lib/clang/23/include/__clang_cuda_builtin_vars.h',
   '"-D__global__=__attribute__((global))"',
-  '-O1 -ffp-contract=off -S -emit-llvm /kernel.cu -o /kernel.ll',
+  '-I/workbench -O1 -ffp-contract=off -S -emit-llvm /kernel.cu -o /kernel.ll',
 ].join(' ');
 
 export function compileKernel(compiler, source) {
@@ -18,11 +18,11 @@ export function compileKernel(compiler, source) {
   return compiler.FS.readFile('/kernel.ll', { encoding: 'utf8' });
 }
 
-export async function runKernel(createSimulator, ir, options, profile) {
+export async function prepareKernelRunner(createSimulator, options) {
   const ptx = [];
   const diagnostics = [];
   let insidePtx = false;
-  let output;
+  let output, hex;
   const simulator = await createSimulator({
     ...options,
     noInitialRun: true,
@@ -31,12 +31,20 @@ export async function runKernel(createSimulator, ir, options, profile) {
       else if (line === 'PTX_END') insidePtx = false;
       else if (insidePtx) ptx.push(line);
       else if (line.startsWith('OUTPUT_JSON ')) output = JSON.parse(line.slice(12));
+      else if (line.startsWith('OUTPUT_HEX ')) hex = line.slice(11);
     },
     printErr(line) { diagnostics.push(line.replace(/^LOWERING_ERROR /, '')); },
   });
-  const status = simulator.callMain(profile === 'hello' ? [ir, profile] : [ir]);
-  if (status !== 0 || !output) {
-    throw new Error(diagnostics.join('\n') || 'The functional simulator did not return output.');
-  }
-  return { ptx: ptx.join('\n'), output };
+  return args => {
+    const status = simulator.callMain(args);
+    if (status !== 0 || (!output && !hex)) {
+      throw new Error(diagnostics.join('\n') || 'The functional simulator did not return output.');
+    }
+    return { ptx: ptx.join('\n'), output, hex };
+  };
+}
+
+export async function runKernel(createSimulator, ir, options, profile) {
+  const launch = await prepareKernelRunner(createSimulator, options);
+  return launch(profile === 'hello' ? [ir, profile] : [ir]);
 }

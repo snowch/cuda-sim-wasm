@@ -1,4 +1,5 @@
-import { compileKernel, runKernel } from './pipeline.mjs';
+import { compileProgram, runProgram } from './program.mjs';
+import { compileKernel, prepareKernelRunner, runKernel } from './pipeline.mjs';
 
 let compiler;
 let compilerMessages = [];
@@ -55,25 +56,28 @@ async function initialise(assets) {
   simulatorModule = await WebAssembly.compile(simWasm);
 }
 
-self.onmessage = async ({ data: { source, assets, profile } }) => {
+self.onmessage = async ({ data: { source, assets, profile, fullProgram } }) => {
   try {
     if (assets) await initialise(assets);
     if (!compiler || !simulatorModule) throw new Error('The compiler and simulator could not start.');
     postMessage({ stage: 'Compiling your CUDA source…', ready: true });
     compilerMessages = [];
-    const ir = compileKernel(compiler, source);
-    if (ir === null) {
+    const compiled = fullProgram ? compileProgram(compiler, source, compileKernel) : compileKernel(compiler, source);
+    if (compiled === null) {
       postMessage({ diagnostics: compilerMessages.join('\n'), compileError: true });
       return;
     }
-    postMessage({ stage: 'Running the compiled PTX in GPGPU-Sim…' });
-    const result = await runKernel(createSimulator, ir, {
+    postMessage({ stage: fullProgram ? 'Running main()…' : 'Running the compiled PTX in GPGPU-Sim…' });
+    const options = {
       instantiateWasm(imports, receiveInstance) {
         const instance = new WebAssembly.Instance(simulatorModule, imports);
         receiveInstance(instance, simulatorModule);
         return instance.exports;
       },
-    }, profile);
+    };
+    const result = fullProgram
+      ? await runProgram(compiled, await prepareKernelRunner(createSimulator, options))
+      : await runKernel(createSimulator, compiled, options, profile);
     postMessage({ ...result, diagnostics: compilerMessages.join('\n') });
   } catch (error) {
     postMessage({ error: String(error.message ?? error) });

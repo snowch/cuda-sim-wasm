@@ -178,8 +178,11 @@ std::string lower_ptx(const std::string &ir, bool hello) {
   if (ir.find("target triple = \"nvptx64-nvidia-cuda\"") == std::string::npos)
     throw std::runtime_error("Expected 64-bit CUDA IR from Clang.");
 
+  const std::string attributes = R"((?: [\w.-]+(?:\((?:[^()]|\([^()]*\))*\))?)*)";
+  const std::string argument = attributes + R"( (%[\w.$-]+))";
   static const std::regex signature(
-      R"(^define .*ptx_kernel void @runKernel\(ptr [^,]* (%[\w.$-]+), ptr [^,]* (%[\w.$-]+), i32 [^,]* (%[\w.$-]+)\).*\{$)");
+      R"(^define .*ptx_kernel void @(?:_Z9runKernelPKfPfi|runKernel)\(ptr)" + argument +
+      ", ptr" + argument + ", i32" + argument + R"(\).*\{$)");
   static const std::regex hello_signature(
       R"(^define .*ptx_kernel void @(?:_Z5helloPf|hello)\(ptr(?: [\w.-]+(?:\((?:[^()]|\([^()]*\))*\))?)* (%[\w.$-]+)\).*\{$)");
   Ptx ptx;
@@ -209,5 +212,5 @@ std::string lower_ptx(const std::string &ir, bool hello) {
     ptx.instruction(line);
   }
   if (hello) throw std::runtime_error("Expected __global__ void hello(float*).");
-  throw std::runtime_error("Expected extern \"C\" __global__ void runKernel(const float*, float*, int).");
+  throw std::runtime_error("Expected __global__ void runKernel(const float*, float*, int).");
 }
