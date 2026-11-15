@@ -1,0 +1,168 @@
+diff --git a/gpu-simulator/trace-driven/trace_driven.cc b/gpu-simulator/trace-driven/trace_driven.cc
+index 4b070ed..bee01ab 100644
+--- a/gpu-simulator/trace-driven/trace_driven.cc
++++ b/gpu-simulator/trace-driven/trace_driven.cc
+@@ -30,7 +30,14 @@
+ // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ // POSSIBILITY OF SUCH DAMAGE.
+ 
+-#include <bits/stdc++.h>
++#include <algorithm>
++#include <cassert>
++#include <cstring>
++#include <iomanip>
++#include <limits>
++#include <memory>
++#include <stdexcept>
++#include <utility>
+ #include <math.h>
+ #include <stdio.h>
+ #include <time.h>
+diff --git a/gpu-simulator/trace-parser/trace_parser.cc b/gpu-simulator/trace-parser/trace_parser.cc
+index 316da18..ce7bf54 100644
+--- a/gpu-simulator/trace-parser/trace_parser.cc
++++ b/gpu-simulator/trace-parser/trace_parser.cc
+@@ -1,7 +1,14 @@
+ // developed by Mahmoud Khairy, Purdue Univ
+ // abdallm@purdue.edu
+ 
+-#include <bits/stdc++.h>
++#include <algorithm>
++#include <cassert>
++#include <cstring>
++#include <iomanip>
++#include <limits>
++#include <memory>
++#include <stdexcept>
++#include <utility>
+ #include <math.h>
+ #include <stdio.h>
+ #include <time.h>
+@@ -619,68 +626,13 @@ void trace_parser::get_next_threadblock_traces(
+   }
+ }
+ 
+-PipeReader::PipeReader(const std::string &filePath) { OpenFile(filePath); }
+-
+-void PipeReader::OpenFile(const std::string &filePath) {
+-  if (hasEnding(filePath, ".xz")) {
+-    // Use xz command to decompress .xz files
+-    command = "xz -dc " + filePath;
+-  } else if (hasEnding(filePath, ".traceg")) {
+-    // Use cat command for regular trace files
+-    command = "cat " + filePath;
+-  } else {
+-    throw std::runtime_error("Unsupported file type!");
+-  }
+-
+-  // Open the pipe
+-  pipe = popen(command.c_str(), "r");
+-  if (!pipe) {
+-    throw std::runtime_error("Failed to open pipe!");
++PipeReader::PipeReader(const std::string &filePath)
++    : trace_file(filePath) {
++  if (!hasEnding(filePath, ".traceg") || !trace_file) {
++    throw std::runtime_error("Expected a readable .traceg file: " + filePath);
+   }
+ }
+ 
+ bool PipeReader::readLine(std::string &line) {
+-  char *buffer = nullptr;
+-  size_t len = 0;
+-  ssize_t nread;
+-
+-  // Use getline() to read from the pipe
+-  if ((nread = getline(&buffer, &len, pipe)) != -1) {
+-    line.assign(buffer, nread);  // Assign the read line to the std::string
+-    assert(line.back() == '\n');
+-    line.pop_back();  // Remove the newline character
+-    free(buffer);     // Free the buffer allocated by getline
+-    return true;
+-  }
+-
+-  free(buffer);  // Free the buffer if getline failed or reached EOF
+-  return false;  // End of pipe or error
++  return static_cast<bool>(std::getline(trace_file, line));
+ }
+-
+-// Helper function to check if a string ends with a specific suffix (file
+-// extension)
+-bool PipeReader::hasEnding(const std::string &fullString,
+-                           const std::string &ending) {
+-  if (fullString.length() >= ending.length()) {
+-    return (0 == fullString.compare(fullString.length() - ending.length(),
+-                                    ending.length(), ending));
+-  }
+-  return false;
+-}
+-
+-PipeReader::PipeReader(PipeReader &&other) noexcept
+-    : pipe(other.pipe), command(other.command) {
+-  other.pipe = NULL;
+-  other.command = {};
+-}
+-
+-PipeReader &PipeReader::operator=(PipeReader &&other) noexcept {
+-  if (this != &other) {
+-    pipe = other.pipe;
+-    command = other.command;
+-
+-    other.pipe = NULL;
+-    other.command = {};
+-  }
+-  return *this;
+-}
+\ No newline at end of file
+diff --git a/gpu-simulator/trace-parser/trace_parser.h b/gpu-simulator/trace-parser/trace_parser.h
+index 7e76064..c61683e 100644
+--- a/gpu-simulator/trace-parser/trace_parser.h
++++ b/gpu-simulator/trace-parser/trace_parser.h
+@@ -9,6 +9,7 @@
+ #include <stdlib.h>
+ #include <array>
+ #include <bitset>
++#include <fstream>
+ #include <memory>
+ #include <string>
+ #include <vector>
+@@ -131,37 +132,12 @@ struct inst_trace_t {
+ 
+ class PipeReader {
+  public:
+-  PipeReader() {}  // default: no file opened
+-  PipeReader(const std::string &filePath);
+-
+-  // Destructor to close the pipe
+-  ~PipeReader() {
+-    if (pipe) {
+-      pclose(pipe);  // Close the pipe when done
+-    }
+-  }
+-
+-  // It does not make sense to implement copy semantics for PipeReader,
+-  // because each instance should hold a unique Linux pipe handle
+-  PipeReader(const PipeReader &) = delete;
+-  PipeReader &operator=(const PipeReader &) = delete;
+-
+-  // Move semantics can be supported
+-  PipeReader(PipeReader &&) noexcept;
+-  PipeReader &operator=(PipeReader &&) noexcept;
+-
+-  // Read one line
++  PipeReader() = default;
++  explicit PipeReader(const std::string &filePath);
+   bool readLine(std::string &line);
+ 
+  private:
+-  FILE *pipe = NULL;    // Store the pipe
+-  std::string command;  // Store the shell command to be executed
+-
+-  // Helper function to check if a string ends with a specific suffix (file
+-  // extension)
+-  bool hasEnding(const std::string &fullString, const std::string &ending);
+-
+-  void OpenFile(const std::string &filePath);
++  std::ifstream trace_file;
+ };
+ 
+ class TracezReader;  // forward declaration

@@ -1,0 +1,145 @@
+diff --git a/libcuda/cuda_runtime_api.cc b/libcuda/cuda_runtime_api.cc
+index 9b139fa..67c71fe 100644
+--- a/libcuda/cuda_runtime_api.cc
++++ b/libcuda/cuda_runtime_api.cc
+@@ -138,7 +138,6 @@
+ #include "builtin_types.h"
+ #include "driver_types.h"
+ #include "cuda_api.h"
+-#include "cudaProfiler.h"
+ // clang-format on
+ #if (CUDART_VERSION < 8000)
+ #include "__cudaFatFormat.h"
+@@ -189,7 +188,7 @@ void register_ptx_function(const char *name, function_info *impl) {
+   // no longer need this
+ }
+ 
+-#if defined __APPLE__
++#if defined(__APPLE__) || defined(__EMSCRIPTEN__)
+ #define __my_func__ __PRETTY_FUNCTION__
+ #else
+ #if defined __cplusplus ? __GNUC_PREREQ(2, 6) : __GNUC_PREREQ(2, 4)
+@@ -6959,14 +6958,6 @@ CUresult CUDAAPI cuStreamBatchMemOp(CUstream stream, unsigned int count,
+ }
+ #endif
+ 
+-CUresult cuProfilerInitialize(const char *configFile, const char *outputFile,
+-                              CUoutput_mode outputMode) {
+-  if (g_debug_execution >= 3) {
+-    announce_call(__my_func__);
+-  }
+-  printf("WARNING: this function has not been implemented yet.");
+-  return CUDA_SUCCESS;
+-}
+ CUresult cuProfilerStart(void) {
+   if (g_debug_execution >= 3) {
+     announce_call(__my_func__);
+diff --git a/src/abstract_hardware_model.h b/src/abstract_hardware_model.h
+index 7dd2005..1534734 100644
+--- a/src/abstract_hardware_model.h
++++ b/src/abstract_hardware_model.h
+@@ -1576,13 +1576,9 @@ class warp_inst_t : public inst_t {
+     for (unsigned i = 0; i < num_addrs; i++)
+       m_tma_access_addrs.push_back(addrs[i]);
+   }
+-  void set_tma_access_addrs(const std::vector<new_addr_type> &addrs) {
+-    m_tma_access_addrs = addrs;
+-  }
+-  void set_tma_access_addrs(const std::vector<uint64_t> &addrs) {
+-    for (const auto &addr : addrs) {
+-      m_tma_access_addrs.push_back(addr);
+-    }
++  template <typename Address>
++  void set_tma_access_addrs(const std::vector<Address> &addrs) {
++    m_tma_access_addrs.assign(addrs.begin(), addrs.end());
+   }
+   void push_back_tma_access_addr(new_addr_type addr) {
+     m_tma_access_addrs.push_back(addr);
+diff --git a/src/cuda-sim/cuda-math.h b/src/cuda-sim/cuda-math.h
+index f990d06..804b0c2 100644
+--- a/src/cuda-sim/cuda-math.h
++++ b/src/cuda-sim/cuda-math.h
+@@ -106,7 +106,15 @@ extern float rsqrtf(float);  // CUDA 2.3 beta
+ #define __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+ #define GPGPUSIM_UNDEF_CUDA_INTERNAL_HEADERS
+ #endif
++#ifdef __EMSCRIPTEN__
++#define __isnan __builtin_isnan
++#define __isinf __builtin_isinf
++#endif
+ #include <math_functions.h>
++#ifdef __EMSCRIPTEN__
++#undef __isnan
++#undef __isinf
++#endif
+ #ifdef GPGPUSIM_UNDEF_CUDA_INTERNAL_HEADERS
+ #undef __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+ #undef GPGPUSIM_UNDEF_CUDA_INTERNAL_HEADERS
+@@ -363,7 +371,15 @@ int __signbitd(double d) {
+ #define __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+ #define GPGPUSIM_UNDEF_CUDA_INTERNAL_HEADERS
+ #endif
++#ifdef __EMSCRIPTEN__
++#define __isnan __builtin_isnan
++#define __isinf __builtin_isinf
++#endif
+ #include <math_functions.h>
++#ifdef __EMSCRIPTEN__
++#undef __isnan
++#undef __isinf
++#endif
+ #ifdef GPGPUSIM_UNDEF_CUDA_INTERNAL_HEADERS
+ #undef __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+ #undef GPGPUSIM_UNDEF_CUDA_INTERNAL_HEADERS
+diff --git a/src/cuda-sim/ptxinfo.l b/src/cuda-sim/ptxinfo.l
+index d2ff6d5..d099992 100644
+--- a/src/cuda-sim/ptxinfo.l
++++ b/src/cuda-sim/ptxinfo.l
+@@ -94,7 +94,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ %%
+ 
+-int ptxinfo_error(yyscan_t yyscanner, ptxinfo_data* ptxinfo, const char* msg)
++void ptxinfo_error(yyscan_t yyscanner, ptxinfo_data* ptxinfo, const char* msg)
+ {
+     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
+ 	int i;
+@@ -113,5 +113,4 @@ int ptxinfo_error(yyscan_t yyscanner, ptxinfo_data* ptxinfo, const char* msg)
+ 	printf("^\n\n");
+ 	fflush(stdout);
+ 	exit(43);
+-	return 0;
+ }
+diff --git a/src/gpgpu-sim/gpu-sim.cc b/src/gpgpu-sim/gpu-sim.cc
+index 07c0999..7f4b58f 100644
+--- a/src/gpgpu-sim/gpu-sim.cc
++++ b/src/gpgpu-sim/gpu-sim.cc
+@@ -32,7 +32,9 @@
+ 
+ #include "gpu-sim.h"
+ 
++#ifndef __EMSCRIPTEN__
+ #include <execinfo.h>
++#endif
+ #include <math.h>
+ #include <signal.h>
+ #include <stdio.h>
+@@ -1023,6 +1025,7 @@ void sst_gpgpu_sim::createSIMTCluster() {
+   SST_gpgpu_reply_buffer.resize(m_shader_config->n_simt_clusters);
+ }
+ 
++#ifndef __EMSCRIPTEN__
+ // Crash handler for debugging - prints backtrace on SIGSEGV/SIGABRT
+ static void crash_handler(int sig) {
+   void *array[50];
+@@ -1046,6 +1049,10 @@ static void install_crash_handlers() {
+   }
+ }
+ 
++#else
++static void install_crash_handlers() {}
++#endif
++
+ gpgpu_sim::gpgpu_sim(const gpgpu_sim_config &config, gpgpu_context *ctx)
+     : gpgpu_t(config, ctx), m_config(config) {
+   install_crash_handlers();
