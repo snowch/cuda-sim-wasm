@@ -40,29 +40,40 @@ file(WRITE "${CMAKE_BINARY_DIR}/accelsim_version.h"
     "const char *g_accelsim_version = \"WebAssembly trace experiment\";\n")
 
 set(SIM "${ACCEL_ROOT}/gpu-simulator")
-add_executable(trace-replay
+add_library(trace_frontend OBJECT
     "${SIM}/main.cc"
     "${SIM}/accel-sim.cc"
     "${SIM}/trace-driven/trace_driven.cc"
-    "${SIM}/trace-parser/trace_parser.cc"
-    $<TARGET_OBJECTS:gpgpusim_entrypoint>)
-target_include_directories(trace-replay PRIVATE
+    "${SIM}/trace-parser/trace_parser.cc")
+target_include_directories(trace_frontend PRIVATE
     "${CMAKE_BINARY_DIR}"
     "${GPGPU_ROOT}/src"
     "${SIM}/ISA_Def"
     "${SIM}/trace-driven"
     "${SIM}/trace-parser"
     "${ACCEL_ROOT}/util/tracer_nvbit/tracer_tool")
-target_link_libraries(trace-replay PRIVATE
-    cuda ptxsim gpgpusim intersim accelwattch trace_zstd ${ZLIB_LINK})
-if(EMSCRIPTEN)
-    set_target_properties(trace-replay PROPERTIES SUFFIX ".js")
-    file(GLOB_RECURSE fixture_files CONFIGURE_DEPENDS "${TRACE_FIXTURE}/*")
-    set_property(TARGET trace-replay APPEND PROPERTY LINK_DEPENDS ${fixture_files})
-    target_link_options(trace-replay PRIVATE -fexceptions
-        -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2097152
-        -sENVIRONMENT=web,worker,node
-        -sMODULARIZE=1 -sEXPORT_NAME=createTraceSimulator
-        -sEXPORTED_RUNTIME_METHODS=callMain
-        "SHELL:--preload-file ${TRACE_FIXTURE}@/fixture")
+target_link_libraries(trace_frontend PRIVATE cuda trace_zstd)
+
+function(add_trace_replay target fixture)
+    add_executable(${target}
+        $<TARGET_OBJECTS:trace_frontend>
+        $<TARGET_OBJECTS:gpgpusim_entrypoint>)
+    target_link_libraries(${target} PRIVATE
+        cuda ptxsim gpgpusim intersim accelwattch trace_zstd ${ZLIB_LINK})
+    if(EMSCRIPTEN)
+        set_target_properties(${target} PROPERTIES SUFFIX ".js")
+        file(GLOB_RECURSE fixture_files CONFIGURE_DEPENDS "${fixture}/*")
+        set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS ${fixture_files})
+        target_link_options(${target} PRIVATE -fexceptions
+            -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2097152
+            -sENVIRONMENT=web,worker,node
+            -sMODULARIZE=1 -sEXPORT_NAME=createTraceSimulator
+            -sEXPORTED_RUNTIME_METHODS=callMain
+            "SHELL:--preload-file ${fixture}@/fixture")
+    endif()
+endfunction()
+
+add_trace_replay(trace-replay "${TRACE_FIXTURE}")
+if(EMSCRIPTEN AND COALESCING_FIXTURE)
+    add_trace_replay(coalescing-replay "${COALESCING_FIXTURE}")
 endif()

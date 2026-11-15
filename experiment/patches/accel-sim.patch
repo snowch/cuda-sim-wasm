@@ -12,6 +12,38 @@ index c709f4b..6116895 100644
        tracer.parse_memcpy_info(commandlist[commandlist_index].command_string, addre, Bcount);
        std::cout << "launching memcpy command : "
                  << commandlist[commandlist_index].command_string << std::endl;
+diff --git a/gpu-simulator/main.cc b/gpu-simulator/main.cc
+index 37002a6..fddfad1 100644
+--- a/gpu-simulator/main.cc
++++ b/gpu-simulator/main.cc
+@@ -3,6 +3,8 @@
+ 
+ #include "accel-sim.h"
+ 
++#include <chrono>
++
+ /* TO DO:
+  * NOTE: the current version of trace-driven is functionally working fine,
+  * but we still need to improve traces compression and simulation speed.
+@@ -26,8 +28,18 @@
+  */
+ 
+ int main(int argc, const char **argv) {
++  using Clock = std::chrono::steady_clock;
++  using Micros = std::chrono::microseconds;
++  const auto start = Clock::now();
+   accel_sim_framework accel_sim(argc, argv);
++  const auto ready = Clock::now();
+   accel_sim.simulation_loop();
++  const auto done = Clock::now();
++
++  printf("trace_sim_init_us = %lld\n", static_cast<long long>(
++      std::chrono::duration_cast<Micros>(ready - start).count()));
++  printf("trace_sim_replay_us = %lld\n", static_cast<long long>(
++      std::chrono::duration_cast<Micros>(done - ready).count()));
+ 
+   // we print this message to inform the gpgpu-simulation stats_collect script
+   // that we are done
 diff --git a/gpu-simulator/trace-driven/trace_driven.cc b/gpu-simulator/trace-driven/trace_driven.cc
 index 4b070ed..bee01ab 100644
 --- a/gpu-simulator/trace-driven/trace_driven.cc

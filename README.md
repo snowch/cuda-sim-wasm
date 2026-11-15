@@ -50,3 +50,15 @@ The offline check passed on the physical Lenovo tablet. The first LU kernel matc
 | WebAssembly startup | 28 ms |
 | Simulator initialization and replay | 1,235 ms |
 | Sum of measured phases | 1,364 ms |
+
+## Memory coalescing demo
+
+The demo shows one aligned 4-byte load per lane, with a choice of 4- or 128-byte stride. The address diagram updates immediately. The Run simulation button replays the corresponding synthetic trace in the A100 timing model and checks its counters against the native reference.
+
+Build the experiment first. With Emscripten still active, generate the self-contained page and open it in a browser.
+
+```sh
+node demo/build.cjs .experiment .experiment/memory-coalescing.html
+```
+
+The page runs offline with the two synthetic fixtures. Its worker compiles WebAssembly once and starts a fresh simulator instance per run. The timing table separates instance setup, simulator initialization and trace replay. Simulated GPU cycles and browser wall time describe different quantities.

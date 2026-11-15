@@ -9,15 +9,19 @@ const traceReplay = (() => {
     function track() {
         const kernels = [];
         let completed = false;
+        const timing = {};
         return {
             push(line) {
                 if (line === 'GPGPU-Sim: *** exit detected ***') completed = true;
                 const match = /^([\w]+) = (\d+)\s*$/.exec(line);
+                if (match?.[1] === 'trace_sim_init_us') timing.simulatorInitMs = Number(match[2]) / 1000;
+                if (match?.[1] === 'trace_sim_replay_us') timing.simulatorReplayMs = Number(match[2]) / 1000;
                 const key = match && counterNames.get(match[1]);
                 if (!key) return;
                 if (key === 'cycles') kernels.push({});
                 kernels.at(-1)[key] = Number(match[2]);
             },
+            timing,
             result(expectedKernels) {
                 if (!completed || kernels.length !== expectedKernels ||
                     kernels.some(kernel => Object.keys(kernel).length !== counterNames.size)) {
@@ -50,6 +54,7 @@ const traceReplay = (() => {
         return {
             kernels: tracker.result(test.kernels),
             startupMs: Math.round(ready - start),
+            ...tracker.timing,
             replayMs: Math.round(performance.now() - ready),
         };
     }
