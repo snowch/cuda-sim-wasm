@@ -53,6 +53,10 @@ mkdir -p "$work/fixture/traces"
 cp -p "$work/gpgpu/configs/tested-cfgs/SM80_A100/gpgpusim.config" "$work/fixture/"
 cp -p "$work/accel/gpu-simulator/configs/tested-cfgs/SM80_A100/trace.config" "$work/fixture/"
 cp -p "$experiment"/traces/* "$work/fixture/traces/"
+python3 "$experiment/prepare-hardware.py" "$work"
+mkdir -p "$work/fixture/hardware/volta"
+cp -p "$work/gpgpu/configs/tested-cfgs/SM7_GV100/gpgpusim.config" "$work/fixture/hardware/volta/"
+cp -p "$work/accel/gpu-simulator/configs/tested-cfgs/SM7_GV100/trace.config" "$work/fixture/hardware/volta/"
 
 options=(-S "$experiment"
     -DACCEL_ROOT="$work/accel" -DGPGPU_ROOT="$work/gpgpu"
@@ -65,4 +69,4 @@ emcmake cmake "${options[@]}" -B "$work/wasm"
 cmake --build "$work/wasm" --parallel "$jobs"
 
 node "$experiment/compare.cjs" "$work/native/trace-replay" \
-    "$work/fixture" "$work/wasm/trace-replay.js"
+    "$work/fixture" "$work/wasm/trace-replay.js" "$work/results.json"

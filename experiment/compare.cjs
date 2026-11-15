@@ -1,52 +1,38 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
+const { writeFileSync } = require('node:fs');
 const path = require('node:path');
+const cases = require('./cases.json');
+const replay = require('./replay.js');
 
-const [native, fixture, wasm] = process.argv.slice(2).map(value => path.resolve(value));
-const metrics = ['gpu_sim_cycle', 'gpu_sim_insn', 'gpgpu_n_mem_read_global'];
-
-function argumentsFor(root, traceList) {
-    return [
-        '-config', `${root}/gpgpusim.config`,
-        '-config', `${root}/trace.config`,
-        '-trace', `${root}/traces/${traceList}`,
-    ];
-}
-
-function counters(output) {
-    assert.match(output, /GPGPU-Sim: \*\*\* exit detected \*\*\*/);
-    return Object.fromEntries(metrics.map(name => {
-        const match = output.match(new RegExp(`^${name} = (\\d+)\\s*$`, 'm'));
-        assert.ok(match, `Missing counter ${name}`);
-        assert.ok(Number(match[1]) > 0, `Expected a positive value for ${name}`);
-        return [name, Number(match[1])];
-    }));
-}
+const [native, fixture, wasm, resultsFile] = process.argv.slice(2).map(value => path.resolve(value));
 
 async function main() {
     const createSimulator = require(wasm);
     const results = {};
-    for (const [label, traceList] of [['coalesced', 'kernelslist.g'], ['strided', 'strided.g']]) {
-        const nativeOutput = execFileSync(native, argumentsFor(fixture, traceList), {
-            cwd: fixture,
+    for (const test of cases) {
+        const nativeOutput = execFileSync(native, replay.args(fixture, test), {
+            cwd: path.join(fixture, test.config),
             encoding: 'utf8',
-            timeout: 30_000,
+            timeout: 90_000,
+            maxBuffer: 16 * 1024 * 1024,
         });
+        const tracker = replay.track();
+        nativeOutput.split('\n').forEach(line => tracker.push(line));
+        const reference = tracker.result(test.kernels);
 
-        const wasmOutput = [];
-        await createSimulator({
-            arguments: argumentsFor('/fixture', traceList),
+        const result = await replay.run(createSimulator, test, {
             locateFile: filename => path.join(path.dirname(wasm), filename),
-            print: line => wasmOutput.push(line),
-            printErr: line => console.error(line),
         });
 
-        results[label] = counters(nativeOutput);
-        assert.deepEqual(counters(wasmOutput.join('\n')), results[label], label);
+        assert.deepEqual(result.kernels, reference, test.name);
+        results[test.name] = reference;
+        console.log(test.name, reference.at(-1), result.startupMs, result.replayMs);
     }
-
-    assert.ok(results.strided.gpgpu_n_mem_read_global > results.coalesced.gpgpu_n_mem_read_global);
-    console.table(results);
+    assert.ok(results.strided[0].reads > results.coalesced[0].reads);
+    assert.ok(results['lud-complete'].at(-1).writes > 0);
+    assert.ok(results['nw-complete'].at(-1).writes > 0);
+    writeFileSync(resultsFile, JSON.stringify(results, null, 2) + '\n');
 }
 
 main().catch(error => {

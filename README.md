@@ -1,28 +1,41 @@
 # cuda-sim-wasm
 
-The first experiment builds Accel-Sim's trace frontend and the GPGPU-Sim timing model for native Linux and WebAssembly. It replays two synthetic SASS traces with the upstream A100 configuration. Each trace launches one 32-lane warp with one 4-byte global load per lane, followed by an exit instruction.
+This experiment builds Accel-Sim's trace frontend and the GPGPU-Sim timing model for native Linux and WebAssembly. It compares cycles, thread instructions, global-memory read requests, and global-memory write requests after every kernel.
 
-| Access pattern | Bytes between lane addresses | Simulated cycles | Simulated thread instructions | Global read requests |
-| --- | ---: | ---: | ---: | ---: |
-| Coalesced | 4 | 5,497 | 64 | 4 |
-| Strided | 128 | 5,523 | 64 | 32 |
+| Replay | GPU model | Kernels | Simulated cycles | Thread instructions | Global reads | Global writes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Synthetic coalesced load, 4-byte stride | A100 | 1 | 5,497 | 64 | 4 | 0 |
+| Synthetic strided load, 128-byte stride | A100 | 1 | 5,523 | 64 | 32 | 0 |
+| Rodinia LU decomposition, first kernel and input copy | V100 | 1 | 20,908 | 19,673 | 32 | 240 |
+| Rodinia LU decomposition, full trace | V100 | 10 | 127,309 | 418,884 | 2,048 | 1,780 |
+| Rodinia Needleman–Wunsch, full trace | V100 | 15 | 132,656 | 595,236 | 4,160 | 2,944 |
 
-Native Linux, Node.js WebAssembly, and a Chromium Web Worker produced the same counters. The read count is the model's global read requests injected into the interconnect. The cycle counts describe this fixture and model configuration. These synthetic traces establish build and replay parity for two cases. Hardware accuracy, recorded workloads, editable kernels, and device performance are outside this experiment.
+The read and write counts are global-memory requests injected into the modeled interconnect. These results verify cross-runtime replay parity. They do not measure hardware timing accuracy.
+
+The hardware traces are from the [Accel-Sim pre-collected Rodinia suite](https://engineering.purdue.edu/tgrogers/accel-sim/traces/tesla-v100/latest/). The LU decomposition case uses the 64 × 64 input. Needleman–Wunsch uses dimension 128 and penalty 10. Both retain the original host-to-device copy records and kernel sequence.
+
+Those input copies exposed a portability bug. On wasm32, `size_t` was too narrow for the recorded GPU addresses. The port now preserves 64-bit GPU addresses through trace parsing, address mapping, and the simulated L2 cache fill. Before that fix, WebAssembly reported 128,022 and 137,655 cycles for the two full traces.
 
 ## Reproduce
 
-Use Linux x86-64 with a C++17 compiler, CMake 3.20+, Make, Git, Flex, Bison, M4, zlib and zstd development headers, Python 3 with pip, Node.js, and Emscripten 4.0.23 active. The script fetches pinned upstream sources and CUDA headers. Trace replay requires no NVIDIA GPU.
+Use Linux x86-64 with a C++17 compiler, CMake 3.20+, Make, Git, Flex, Bison, M4, zlib and zstd development headers, Python 3.9+ with pip, Node.js, and Emscripten 4.0.23 active. The script fetches pinned upstream sources, CUDA headers, and the checksummed 20 MB trace archive. Trace replay requires no NVIDIA GPU.
 
 ```sh
 ./experiment/run.sh
 ```
 
-The runner builds both targets under `.experiment/` and fails if their counters differ. It uses plain-text traces and reads them through the WebAssembly filesystem. AccelWattch is linked with power simulation disabled in the test configuration.
+The runner builds both targets under `.experiment/`, compares the two backends, and writes the native reference counters to `.experiment/results.json`. AccelWattch is linked with power simulation disabled in the tested configurations.
 
-To repeat the browser check with Playwright available to Node and its Chromium browser installed, run the following command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a specific Chromium executable.
+To repeat the Web Worker checks, make Playwright and Chromium available to Node and run the following command. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a specific Chromium executable.
 
 ```sh
-node experiment/browser-check.cjs .experiment/wasm
+node experiment/browser-check.cjs .experiment/wasm .experiment/results.json
 ```
 
-The first replay is a starting point for testing a short hardware-recorded trace and measuring the worker's startup and replay time on target devices.
+With Emscripten still active, generate an offline browser timing check for the first LU kernel. Open the resulting HTML in a browser with WebAssembly, Web Workers, and `DecompressionStream` support.
+
+```sh
+node experiment/tablet-check.cjs .experiment .experiment/tablet-check.html
+```
+
+The timing check reports asset unpacking, WebAssembly startup, and simulator initialization plus replay separately. Device performance depends on the browser and hardware.

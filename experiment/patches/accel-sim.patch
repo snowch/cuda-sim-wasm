@@ -1,3 +1,17 @@
+diff --git a/gpu-simulator/accel-sim.cc b/gpu-simulator/accel-sim.cc
+index c709f4b..6116895 100644
+--- a/gpu-simulator/accel-sim.cc
++++ b/gpu-simulator/accel-sim.cc
+@@ -96,7 +96,8 @@ void accel_sim_framework::parse_commandlist() {
+   while (kernels_info.size() < window_size && commandlist_index < commandlist.size()) {
+     trace_kernel_info_t *kernel_info = NULL;
+     if (commandlist[commandlist_index].m_type == command_type::cpu_gpu_mem_copy) {
+-      size_t addre, Bcount;
++      uint64_t addre;
++      uint64_t Bcount;
+       tracer.parse_memcpy_info(commandlist[commandlist_index].command_string, addre, Bcount);
+       std::cout << "launching memcpy command : "
+                 << commandlist[commandlist_index].command_string << std::endl;
 diff --git a/gpu-simulator/trace-driven/trace_driven.cc b/gpu-simulator/trace-driven/trace_driven.cc
 index 4b070ed..bee01ab 100644
 --- a/gpu-simulator/trace-driven/trace_driven.cc
@@ -19,7 +33,7 @@ index 4b070ed..bee01ab 100644
  #include <stdio.h>
  #include <time.h>
 diff --git a/gpu-simulator/trace-parser/trace_parser.cc b/gpu-simulator/trace-parser/trace_parser.cc
-index 316da18..ce7bf54 100644
+index 316da18..7d104dc 100644
 --- a/gpu-simulator/trace-parser/trace_parser.cc
 +++ b/gpu-simulator/trace-parser/trace_parser.cc
 @@ -1,7 +1,14 @@
@@ -38,6 +52,15 @@ index 316da18..ce7bf54 100644
  #include <math.h>
  #include <stdio.h>
  #include <time.h>
+@@ -428,7 +435,7 @@ std::vector<trace_command> trace_parser::parse_commandlist_file() {
+ }
+ 
+ void trace_parser::parse_memcpy_info(const std::string &memcpy_command,
+-                                     size_t &address, size_t &count) {
++                                     uint64_t &address, uint64_t &count) {
+   std::vector<std::string> params;
+   split(memcpy_command, params, ',');
+   assert(params.size() == 3);
 @@ -619,68 +626,13 @@ void trace_parser::get_next_threadblock_traces(
    }
  }
@@ -114,7 +137,7 @@ index 316da18..ce7bf54 100644
 -}
 \ No newline at end of file
 diff --git a/gpu-simulator/trace-parser/trace_parser.h b/gpu-simulator/trace-parser/trace_parser.h
-index 7e76064..c61683e 100644
+index 7e76064..8be7539 100644
 --- a/gpu-simulator/trace-parser/trace_parser.h
 +++ b/gpu-simulator/trace-parser/trace_parser.h
 @@ -9,6 +9,7 @@
@@ -166,3 +189,14 @@ index 7e76064..c61683e 100644
  };
  
  class TracezReader;  // forward declaration
+@@ -205,8 +181,8 @@ class trace_parser {
+ 
+   kernel_trace_t *parse_kernel_info(const std::string &kerneltraces_filepath);
+ 
+-  void parse_memcpy_info(const std::string &memcpy_command, size_t &add,
+-                         size_t &count);
++  void parse_memcpy_info(const std::string &memcpy_command, uint64_t &add,
++                         uint64_t &count);
+ 
+   void get_next_threadblock_traces(
+       std::vector<std::vector<inst_trace_t> *> threadblock_traces,

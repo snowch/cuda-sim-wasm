@@ -111,7 +111,7 @@ index d2ff6d5..d099992 100644
 -	return 0;
  }
 diff --git a/src/gpgpu-sim/gpu-sim.cc b/src/gpgpu-sim/gpu-sim.cc
-index 07c0999..7f4b58f 100644
+index 07c0999..9bf0324 100644
 --- a/src/gpgpu-sim/gpu-sim.cc
 +++ b/src/gpgpu-sim/gpu-sim.cc
 @@ -32,7 +32,9 @@
@@ -143,3 +143,79 @@ index 07c0999..7f4b58f 100644
  gpgpu_sim::gpgpu_sim(const gpgpu_sim_config &config, gpgpu_context *ctx)
      : gpgpu_t(config, ctx), m_config(config) {
    install_crash_handlers();
+@@ -2528,15 +2535,16 @@ void shader_core_ctx::dump_warp_state(FILE *fout) const {
+     m_warp[w]->print(fout);
+ }
+ 
+-void gpgpu_sim::perf_memcpy_to_gpu(size_t dst_start_addr, size_t count) {
++void gpgpu_sim::perf_memcpy_to_gpu(new_addr_type dst_start_addr,
++                                  unsigned long long count) {
+   if (m_memory_config->m_perf_sim_memcpy) {
+     // if(!m_config.trace_driven_mode)    //in trace-driven mode, CUDA runtime
+     // can start nre data structure at any position 	assert (dst_start_addr %
+     // 32
+     //== 0);
+ 
+-    for (unsigned counter = 0; counter < count; counter += 32) {
+-      const size_t wr_addr = dst_start_addr + counter;
++    for (unsigned long long counter = 0; counter < count; counter += 32) {
++      const new_addr_type wr_addr = dst_start_addr + counter;
+       addrdec_t raw_addr;
+       mem_access_sector_mask_t mask;
+       mask.set(wr_addr % 128 / 32);
+diff --git a/src/gpgpu-sim/gpu-sim.h b/src/gpgpu-sim/gpu-sim.h
+index 5dc595d..ac1967b 100644
+--- a/src/gpgpu-sim/gpu-sim.h
++++ b/src/gpgpu-sim/gpu-sim.h
+@@ -658,7 +658,8 @@ class gpgpu_sim : public gpgpu_t {
+   void gpu_print_stat(unsigned long long streamID);
+   void dump_pipeline(int mask, int s, int m) const;
+ 
+-  void perf_memcpy_to_gpu(size_t dst_start_addr, size_t count);
++  void perf_memcpy_to_gpu(new_addr_type dst_start_addr,
++                          unsigned long long count);
+ 
+   // The next three functions added to be used by the functional simulation
+   // function
+@@ -941,7 +942,8 @@ class sst_gpgpu_sim : public gpgpu_sim {
+    * @param dst_start_addr
+    * @param count
+    */
+-  void perf_memcpy_to_gpu(size_t dst_start_addr, size_t count){};
++  void perf_memcpy_to_gpu(new_addr_type dst_start_addr,
++                          unsigned long long count){};
+ 
+   /**
+    * @brief Check if the SST config matches up with the
+diff --git a/src/gpgpu-sim/l2cache.cc b/src/gpgpu-sim/l2cache.cc
+index 308d43d..1eaf0ca 100644
+--- a/src/gpgpu-sim/l2cache.cc
++++ b/src/gpgpu-sim/l2cache.cc
+@@ -107,12 +107,12 @@ memory_partition_unit::memory_partition_unit(
+ }
+ 
+ void memory_partition_unit::handle_memcpy_to_gpu(
+-    size_t addr, unsigned global_subpart_id, mem_access_sector_mask_t mask) {
++    new_addr_type addr, unsigned global_subpart_id, mem_access_sector_mask_t mask) {
+   unsigned p = global_sub_partition_id_to_local_id(global_subpart_id);
+   std::string mystring = mask.to_string<char, std::string::traits_type,
+                                         std::string::allocator_type>();
+   MEMPART_DPRINTF(
+-      "Copy Engine Request Received For Address=%zx, local_subpart=%u, "
++      "Copy Engine Request Received For Address=%llx, local_subpart=%u, "
+       "global_subpart=%u, sector_mask=%s \n",
+       addr, p, global_subpart_id, mystring.c_str());
+   m_sub_partition[p]->force_l2_tag_update(
+diff --git a/src/gpgpu-sim/l2cache.h b/src/gpgpu-sim/l2cache.h
+index 6434dea..7c6c9d6 100644
+--- a/src/gpgpu-sim/l2cache.h
++++ b/src/gpgpu-sim/l2cache.h
+@@ -258,7 +258,7 @@ class memory_partition_unit {
+   void print_stat(FILE *fp) { m_dram->print_stat(fp); }
+   void visualize() const { m_dram->visualize(); }
+   void print(FILE *fp) const;
+-  void handle_memcpy_to_gpu(size_t dst_start_addr, unsigned subpart_id,
++  void handle_memcpy_to_gpu(new_addr_type dst_start_addr, unsigned subpart_id,
+                             mem_access_sector_mask_t mask);
+ 
+   class memory_sub_partition *get_sub_partition(int sub_partition_id) {

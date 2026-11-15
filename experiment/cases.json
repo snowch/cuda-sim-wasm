@@ -1,0 +1,7 @@
+[
+  { "name": "coalesced", "config": "", "trace": "traces/kernelslist.g", "kernels": 1 },
+  { "name": "strided", "config": "", "trace": "traces/strided.g", "kernels": 1 },
+  { "name": "lud-first", "config": "hardware/volta/", "trace": "hardware/lud/first.g", "kernels": 1 },
+  { "name": "lud-complete", "config": "hardware/volta/", "trace": "hardware/lud/kernelslist.g", "kernels": 10 },
+  { "name": "nw-complete", "config": "hardware/volta/", "trace": "hardware/nw/kernelslist.g", "kernels": 15 }
+]

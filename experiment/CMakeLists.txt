@@ -63,5 +63,6 @@ if(EMSCRIPTEN)
         -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2097152
         -sENVIRONMENT=web,worker,node
         -sMODULARIZE=1 -sEXPORT_NAME=createTraceSimulator
+        -sEXPORTED_RUNTIME_METHODS=callMain
         "SHELL:--preload-file ${TRACE_FIXTURE}@/fixture")
 endif()

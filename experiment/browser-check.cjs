@@ -3,9 +3,11 @@ const { readFile } = require('node:fs/promises');
 const { createServer } = require('node:http');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const cases = require('./cases.json');
 
-const build = path.resolve(process.argv[2]);
+const [build, resultsFile] = process.argv.slice(2).map(value => path.resolve(value));
 const files = {
+    '/replay.js': [path.join(__dirname, 'replay.js'), 'text/javascript'],
     '/trace-worker.js': [path.join(__dirname, 'trace-worker.js'), 'text/javascript'],
     '/trace-replay.js': [path.join(build, 'trace-replay.js'), 'text/javascript'],
     '/trace-replay.wasm': [path.join(build, 'trace-replay.wasm'), 'application/wasm'],
@@ -47,13 +49,13 @@ async function main() {
         });
         const page = await browser.newPage();
         await page.goto(`http://127.0.0.1:${server.address().port}/`);
-        const results = await page.evaluate(async () => {
-            const results = [];
-            for (const trace of ['kernelslist.g', 'strided.g']) {
+        const results = await page.evaluate(async cases => {
+            const results = {};
+            for (const test of cases) {
                 const worker = new Worker('/trace-worker.js');
                 try {
-                    results.push(await new Promise((resolve, reject) => {
-                        const timeout = setTimeout(() => reject(new Error('Worker timed out')), 30_000);
+                    results[test.name] = await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => reject(new Error('Worker timed out')), 90_000);
                         worker.onerror = ({ message }) => {
                             clearTimeout(timeout);
                             reject(new Error(message));
@@ -63,18 +65,23 @@ async function main() {
                             if (data.error) reject(new Error(data.error));
                             else resolve(data);
                         };
-                        worker.postMessage(trace);
-                    }));
+                        worker.postMessage(test);
+                    });
                 } finally {
                     worker.terminate();
                 }
             }
             return results;
-        });
-        assert.deepEqual(results.map(({ cycles, instructions, reads }) =>
-            [cycles, instructions, reads]), [[5497, 64, 4], [5523, 64, 32]]);
+        }, cases);
+        const reference = JSON.parse(await readFile(resultsFile, 'utf8'));
+        for (const { name } of cases) {
+            assert.deepEqual(results[name].kernels, reference[name], name);
+        }
         console.log(`Chromium ${browser.version()}`);
-        console.table({ coalesced: results[0], strided: results[1] });
+        console.table(Object.fromEntries(Object.entries(results).map(
+            ([name, { kernels, startupMs, replayMs }]) =>
+                [name, { ...kernels.at(-1), startupMs, replayMs }]
+        )));
     } finally {
         if (browser) await browser.close();
         server.close();
