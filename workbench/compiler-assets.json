@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Compiler.js",
+    "sha256": "97fcbfb779813deb4ca6dc36f5550226507f8be53d8b1c0cd87e1820a4ce53b4"
+  },
+  {
+    "name": "Compiler.wasm",
+    "sha256": "15c16d146e8caf71e60b19f4703984f948f1d46a453664d3f982047b16be116d"
+  },
+  {
+    "name": "Compiler.data",
+    "sha256": "6acf560c2a76ea615c37b89622385d245044250a30ffd4bf0b951e2539ed8d46"
+  }
+]

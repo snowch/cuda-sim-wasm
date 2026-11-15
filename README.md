@@ -69,3 +69,9 @@ On the physical Lenovo tablet, two runs of the 4-byte stride matched the native 
 | --- | ---: | ---: | ---: |
 | First | 13 ms | 247.8 ms | 314.3 ms |
 | Repeat | 4 ms | 331.7 ms | 285.8 ms |
+
+## Editable CUDA workbench
+
+A separate workbench compiles an edited CUDA device kernel in the browser,
+lowers the supported LLVM IR to PTX, and executes it in the functional
+GPGPU-Sim model. See the [workbench build and supported edits](workbench/README.md).

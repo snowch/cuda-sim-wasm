@@ -77,3 +77,23 @@ add_trace_replay(trace-replay "${TRACE_FIXTURE}")
 if(EMSCRIPTEN AND COALESCING_FIXTURE)
     add_trace_replay(coalescing-replay "${COALESCING_FIXTURE}")
 endif()
+
+if(COALESCING_FIXTURE)
+    add_executable(run-ptx
+        ../workbench/run-ptx.cc
+        ../workbench/lower-ptx.cc
+        $<TARGET_OBJECTS:gpgpusim_entrypoint>)
+    target_include_directories(run-ptx PRIVATE "${GPGPU_ROOT}/src")
+    target_link_libraries(run-ptx PRIVATE
+        cuda ptxsim gpgpusim intersim accelwattch ${ZLIB_LINK})
+    if(EMSCRIPTEN)
+        set_target_properties(run-ptx PROPERTIES SUFFIX ".js")
+        set(ptx_config "${COALESCING_FIXTURE}/gpgpusim.config")
+        set_property(TARGET run-ptx APPEND PROPERTY LINK_DEPENDS "${ptx_config}")
+        target_link_options(run-ptx PRIVATE -fexceptions
+            -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2097152
+            -sENVIRONMENT=worker,node -sMODULARIZE=1 -sEXPORT_NAME=createPtxSimulator
+            -sEXPORTED_RUNTIME_METHODS=callMain
+            "SHELL:--embed-file ${ptx_config}@/gpgpusim.config")
+    endif()
+endif()
