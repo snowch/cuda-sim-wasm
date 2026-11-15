@@ -62,3 +62,10 @@ node demo/build.cjs .experiment .experiment/memory-coalescing.html
 ```
 
 The page runs offline with the two synthetic fixtures. Its worker compiles WebAssembly once and starts a fresh simulator instance per run. The timing table separates instance setup, simulator initialization and trace replay. Simulated GPU cycles and browser wall time describe different quantities.
+
+On the physical Lenovo tablet, two runs of the 4-byte stride matched the native reference (4 global reads and 5,497 simulated cycles). Asset unpacking and compilation took 78.8 ms once.
+
+| Run | WebAssembly setup | Simulator initialization | Replay |
+| --- | ---: | ---: | ---: |
+| First | 13 ms | 247.8 ms | 314.3 ms |
+| Repeat | 4 ms | 331.7 ms | 285.8 ms |
