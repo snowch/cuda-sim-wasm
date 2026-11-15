@@ -90,3 +90,16 @@ for (const [edit, stdout] of [
   assert.ok(outcome.events.includes('hello · 1 block × 1 thread'));
   console.log(outcome.stdout.trim(), 'from main()');
 }
+
+const coalescing = await readFile(new URL('./coalescing.cu', import.meta.url), 'utf8');
+for (const [stride, sectors] of [[1, 4], [2, 8], [32, 32]]) {
+  const program = compileProgram(compiler, coalescing.replace('stride = 1', 'stride = ' + stride), compileKernel);
+  assert.ok(program, diagnostics.join('\n'));
+  const execute = await prepareKernelRunner(createSimulator, {
+    locateFile: name => resolve(simulatorDirectory, name),
+  });
+  const result = await runProgram(program, execute);
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdout, `Sectors touched: ${sectors}\n`);
+  console.log('Stride ' + stride, result.stdout.trim());
+}

@@ -13,7 +13,7 @@ const fullProgram = document.documentElement.dataset.program === 'true';
 const consoleOutput = document.querySelector('#program-output');
 const operations = document.querySelector('#program-operations');
 if (fullProgram) {
-  editor.value = profile ? lab.firstProgram : lab.arrayProgram;
+  editor.value = profile ? lab.firstProgram : mode === 'coalescing' ? lab.coalescingProgram : lab.arrayProgram;
   document.querySelector('#output-title + p').textContent = 'Output from main() in this browser.';
   values.closest('table').hidden = true;
   consoleOutput.hidden = false;
@@ -26,7 +26,7 @@ if (fullProgram) {
 }
 const starter = editor.value;
 const storageKey = 'gpu-lab-v2:editable-cuda-kernel' +
-  (['hello', 'scale', 'bounds', 'copies'].includes(mode) ? mode : '') + (fullProgram ? ':program' : '');
+  (['hello', 'scale', 'bounds', 'copies', 'coalescing'].includes(mode) ? mode : '') + (fullProgram ? ':program' : '');
 let engine;
 let workerUrl;
 let prepared = false;
