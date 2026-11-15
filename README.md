@@ -39,3 +39,14 @@ node experiment/tablet-check.cjs .experiment .experiment/tablet-check.html
 ```
 
 The timing check reports asset unpacking, WebAssembly startup, and simulator initialization plus replay separately. Device performance depends on the browser and hardware.
+
+## Physical Lenovo tablet result
+
+The offline check passed on the physical Lenovo tablet. The first LU kernel matched the native reference on all four counters: 20,908 simulated cycles, 19,673 simulated instructions, 32 global reads, and 240 global writes.
+
+| Measured phase | One run |
+| --- | ---: |
+| Asset unpacking | 101 ms |
+| WebAssembly startup | 28 ms |
+| Simulator initialization and replay | 1,235 ms |
+| Sum of measured phases | 1,364 ms |
