@@ -7,8 +7,18 @@ const diagnostics = document.querySelector('#diagnostics');
 const values = document.querySelector('#values');
 const ptxPanel = document.querySelector('#ptx-panel');
 const ptx = document.querySelector('#ptx');
+const mode = document.documentElement.dataset.inline || new URLSearchParams(location.search).get('embed');
+const profile = mode === 'hello' ? 'hello' : undefined;
+if (profile) {
+  editor.value = lab.firstKernel;
+  document.querySelector('#output-title + p').textContent = 'One block, one thread, one output value.';
+  const table = values.closest('table');
+  table.setAttribute('aria-label', 'Simulated output value');
+  table.querySelector('thead th:nth-child(2)').remove();
+}
 const starter = editor.value;
-const storageKey = 'gpu-lab-v2:editable-cuda-kernel';
+const storageKey = 'gpu-lab-v2:editable-cuda-kernel' +
+  (['hello', 'scale', 'bounds'].includes(mode) ? mode : '');
 let engine;
 let workerUrl;
 let prepared = false;
@@ -17,12 +27,13 @@ let timeout;
 try { editor.value = localStorage.getItem(storageKey) ?? starter; } catch { /* Optional storage. */ }
 
 function showValues(output) {
-  values.replaceChildren(...[1, 2, 3, 4, 5].map((input, index) => {
+  values.replaceChildren(...(profile ? [null] : [1, 2, 3, 4, 5]).map((input, index) => {
     const row = document.createElement('tr');
     const value = output?.[index];
     const formatted = value === undefined ? '—' : value === null ? 'Unwritten'
       : Number.isInteger(value) ? value.toFixed(1) : String(value);
-    for (const text of [index, input.toFixed(1), formatted]) {
+    const cells = profile ? [index, formatted] : [index, input.toFixed(1), formatted];
+    for (const text of cells) {
       const cell = document.createElement(row.children.length ? 'td' : 'th');
       if (!row.children.length) cell.scope = 'row';
       cell.textContent = text;
@@ -112,7 +123,7 @@ run.addEventListener('click', () => {
       shutDown();
       fail('The run timed out.');
     }, 90_000);
-    engine.postMessage({ source: editor.value, assets: prepared ? undefined : lab.assets });
+    engine.postMessage({ source: editor.value, profile, assets: prepared ? undefined : lab.assets });
   } catch (error) {
     shutDown();
     fail('The compiler could not start.', String(error.message ?? error));

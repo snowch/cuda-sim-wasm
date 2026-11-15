@@ -82,7 +82,13 @@ class Ptx {
     } else if (std::regex_match(expr, match, read)) {
       emit("ld.global.f32", output(name, 'f'), "[" + use(match[1], 'd') + "]");
     } else if (std::regex_match(expr, match, write)) {
-      emit("st.global.f32", "[" + use(match[2], 'd') + "]", use(match[1], 'f'));
+      auto value = use(match[1], 'f');
+      if (match[1].str().front() != '%') {
+        const auto reg = temporary('f');
+        emit("mov.f32", reg, value);
+        value = reg;
+      }
+      emit("st.global.f32", "[" + use(match[2], 'd') + "]", value);
     } else if (std::regex_match(expr, match, fp)) {
       emit(match[1].str().substr(1) + ".rn.f32", output(name, 'f'),
            use(match[2], 'f'), use(match[3], 'f'));
@@ -103,10 +109,10 @@ class Ptx {
     }
   }
 
-  std::string finish() const {
-    return ".version 6.0\n.target sm_70\n.address_size 64\n"
-           ".visible .entry runKernel(.param .u64 arg0, .param .u64 arg1, "
-           ".param .u32 arg2) {\n" +
+  std::string finish(bool hello) const {
+    return std::string(".version 6.0\n.target sm_70\n.address_size 64\n") +
+           (hello ? ".visible .entry hello(.param .u64 arg0) {\n"
+                  : ".visible .entry runKernel(.param .u64 arg0, .param .u64 arg1, .param .u32 arg2) {\n") +
            declaration('p', ".pred") + declaration('r', ".b32") +
            declaration('d', ".b64") + declaration('f', ".f32") +
            code_.str() + "}\n";
@@ -166,7 +172,7 @@ class Ptx {
 
 } // namespace
 
-std::string lower_ptx(const std::string &ir) {
+std::string lower_ptx(const std::string &ir, bool hello) {
   if (ir.size() > 128 * 1024)
     throw std::runtime_error("The compiled kernel exceeds the workbench size limit.");
   if (ir.find("target triple = \"nvptx64-nvidia-cuda\"") == std::string::npos)
@@ -174,6 +180,8 @@ std::string lower_ptx(const std::string &ir) {
 
   static const std::regex signature(
       R"(^define .*ptx_kernel void @runKernel\(ptr [^,]* (%[\w.$-]+), ptr [^,]* (%[\w.$-]+), i32 [^,]* (%[\w.$-]+)\).*\{$)");
+  static const std::regex hello_signature(
+      R"(^define .*ptx_kernel void @(?:_Z5helloPf|hello)\(ptr(?: [\w.-]+(?:\((?:[^()]|\([^()]*\))*\))?)* (%[\w.$-]+)\).*\{$)");
   Ptx ptx;
   std::istringstream lines(ir);
   bool found = false;
@@ -188,15 +196,18 @@ std::string lower_ptx(const std::string &ir) {
     line = line.substr(first, last - first + 1);
     if (!found) {
       std::smatch match;
-      if (!std::regex_match(line, match, signature)) continue;
+      if (!std::regex_match(line, match, hello ? hello_signature : signature)) continue;
       ptx.parameter(match[1], 'd', 0);
-      ptx.parameter(match[2], 'd', 1);
-      ptx.parameter(match[3], 'r', 2);
+      if (!hello) {
+        ptx.parameter(match[2], 'd', 1);
+        ptx.parameter(match[3], 'r', 2);
+      }
       found = true;
       continue;
     }
-    if (line == "}") return ptx.finish();
+    if (line == "}") return ptx.finish(hello);
     ptx.instruction(line);
   }
+  if (hello) throw std::runtime_error("Expected __global__ void hello(float*).");
   throw std::runtime_error("Expected extern \"C\" __global__ void runKernel(const float*, float*, int).");
 }

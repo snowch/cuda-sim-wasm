@@ -39,7 +39,8 @@ const assets = {
 const pipeline = (await read('./pipeline.mjs')).replace(/^export /gm, '');
 const worker = (await read('./worker.mjs')).replace(/^import .*\n/, '');
 const lab = { assets, worker: pipeline + '\n' + worker };
-const js = 'const lab = ' + JSON.stringify(lab) + ';\n' + await read('./page.js');
+const firstKernel = await read('./first-kernel.cu');
+const js = 'const lab = ' + JSON.stringify({ ...lab, firstKernel }) + ';\n' + await read('./page.js');
 const starter = await read('./hello.cu');
 const html = (await read('./index.html'))
   .replace('__STARTER__', () => escape(starter))

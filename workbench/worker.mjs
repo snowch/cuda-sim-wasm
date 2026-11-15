@@ -55,7 +55,7 @@ async function initialise(assets) {
   simulatorModule = await WebAssembly.compile(simWasm);
 }
 
-self.onmessage = async ({ data: { source, assets } }) => {
+self.onmessage = async ({ data: { source, assets, profile } }) => {
   try {
     if (assets) await initialise(assets);
     if (!compiler || !simulatorModule) throw new Error('The compiler and simulator could not start.');
@@ -73,7 +73,7 @@ self.onmessage = async ({ data: { source, assets } }) => {
         receiveInstance(instance, simulatorModule);
         return instance.exports;
       },
-    });
+    }, profile);
     postMessage({ ...result, diagnostics: compilerMessages.join('\n') });
   } catch (error) {
     postMessage({ error: String(error.message ?? error) });

@@ -1,5 +1,11 @@
 # Editable CUDA workbench
 
+Use `?embed=hello` to open the one-thread introduction. The editor compiles
+`__global__ void hello(float* output)`, and the runner launches one block with
+one thread and copies back one float. `first-kernel.cu` supplies the editable
+starter. The original `runKernel` activity still uses the five-element launch.
+
+
 The first GPU Lab V2 exercise lets a learner edit a CUDA device kernel and run
 the result entirely in the browser. Try a different multiplier, add an offset,
 or reduce the bounds check by one to leave the last output unwritten.

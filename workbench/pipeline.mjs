@@ -18,7 +18,7 @@ export function compileKernel(compiler, source) {
   return compiler.FS.readFile('/kernel.ll', { encoding: 'utf8' });
 }
 
-export async function runKernel(createSimulator, ir, options) {
+export async function runKernel(createSimulator, ir, options, profile) {
   const ptx = [];
   const diagnostics = [];
   let insidePtx = false;
@@ -34,7 +34,7 @@ export async function runKernel(createSimulator, ir, options) {
     },
     printErr(line) { diagnostics.push(line.replace(/^LOWERING_ERROR /, '')); },
   });
-  const status = simulator.callMain([ir]);
+  const status = simulator.callMain(profile === 'hello' ? [ir, profile] : [ir]);
   if (status !== 0 || !output) {
     throw new Error(diagnostics.join('\n') || 'The functional simulator did not return output.');
   }

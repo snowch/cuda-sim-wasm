@@ -23,7 +23,12 @@ await rm(temporary, { recursive: true, force: true });
 const { default: createSimulator } = await import(
   pathToFileURL(resolve(simulatorDirectory, 'run-ptx.js')).href);
 const starter = await readFile(new URL('./hello.cu', import.meta.url), 'utf8');
-for (const [edit, expected] of [
+const firstKernel = await readFile(new URL('./first-kernel.cu', import.meta.url), 'utf8');
+for (const [edit, expected, profile] of [
+  [firstKernel, [42], 'hello'],
+  [firstKernel.replace('42.0f', '7.0f'), [7], 'hello'],
+  [firstKernel.replace('42.0f', '-3.5f'), [-3.5], 'hello'],
+  [firstKernel.replace('output[0] = 42.0f;', ''), [null], 'hello'],
   [starter, [2, 4, 6, 8, 10]],
   [starter.replace('2.0f', '3.0f'), [3, 6, 9, 12, 15]],
   [starter.replace('input[i] * 2.0f', 'input[i] * 3.0f + 1.0f'), [4, 7, 10, 13, 16]],
@@ -34,9 +39,9 @@ for (const [edit, expected] of [
   assert.ok(ir, diagnostics.join('\n'));
   const result = await runKernel(createSimulator, ir, {
     locateFile: name => resolve(simulatorDirectory, name),
-  });
+  }, profile);
   assert.deepEqual(result.output, expected);
-  assert.match(result.ptx, /\.entry runKernel/);
+  assert.match(result.ptx, profile ? /\.entry hello/ : /\.entry runKernel/);
   console.log(JSON.stringify(result.output));
 }
 assert.equal(compileKernel(compiler, starter.replace('2.0f', 'missingName')), null);
