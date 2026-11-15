@@ -68,3 +68,36 @@ stay in the browser.
 The offline starter kernel compiled and ran on a physical Lenovo tablet. For
 inputs 1 through 5, the page displayed `[2, 4, 6, 8, 10]`. Separate Chromium
 browser tests verified edited kernels and compiler diagnostics.
+
+## CUDA module workbench
+
+The architecture lessons compile the whole editable program. Build the
+`run-module` target alongside `run-ptx` with the Emscripten configuration
+created by `experiment/run.sh`. It adds a device API that preserves device
+memory across CUDA launches in one run. Each run starts a fresh simulator.
+The host runtime provides CUDA calls for allocation, copies, launch, streams
+and events. Stream dependencies determine execution order. Use the course's
+architecture models for timing investigations.
+
+Build the NVPTX backend from
+[LLVM 23.1.0](https://github.com/llvm/llvm-project/tree/ea7d852a70e8bdfaf601d6626a760f9771b2c4b4)
+with Emscripten and the WasmBolt frontend version in `compiler-assets.json`.
+With the checkout in `llvm-project`, run:
+
+```sh
+emcmake cmake -S workbench/nvptx -B .experiment/nvptx \
+  -DLLVM_SOURCE_ROOT="$PWD/llvm-project" -DCMAKE_BUILD_TYPE=MinSizeRel \
+  -DLLVM_TARGETS_TO_BUILD=NVPTX -DLLVM_HOST_TRIPLE=wasm32-unknown-emscripten \
+  -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_INCLUDE_TOOLS=OFF \
+  -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+  -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF \
+  -DLLVM_ENABLE_THREADS=OFF -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_ENABLE_ASSERTIONS=OFF
+cmake --build .experiment/nvptx --target browser-nvptx --parallel
+cmake --build .experiment/wasm --target run-module --parallel
+node workbench/bundle-module.mjs .experiment/nvptx .experiment/wasm /path/to/gpu-lab/assets/cuda-workbench
+```
+
+Set `WORKBENCH_MODULE_DIR` to the directory passed to `bundle-module.mjs`
+when running `build-preview.mjs`. The hosted build loads the module assets on
+the first architecture run. The standalone offline workbench embeds them.
+GPU Lab's build fills in its editable architecture starters.

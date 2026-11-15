@@ -97,3 +97,18 @@ if(COALESCING_FIXTURE)
             "SHELL:--embed-file ${ptx_config}@/gpgpusim.config")
     endif()
 endif()
+
+if(EMSCRIPTEN AND COALESCING_FIXTURE)
+    add_executable(run-module ../workbench/run-module.cc
+        $<TARGET_OBJECTS:gpgpusim_entrypoint>)
+    target_include_directories(run-module PRIVATE "${GPGPU_ROOT}/src")
+    target_link_libraries(run-module PRIVATE
+        cuda ptxsim gpgpusim intersim accelwattch ${ZLIB_LINK})
+    set_target_properties(run-module PROPERTIES SUFFIX ".js")
+    set_property(TARGET run-module APPEND PROPERTY LINK_DEPENDS "${ptx_config}")
+    target_link_options(run-module PRIVATE --no-entry -fexceptions
+        -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2097152
+        -sENVIRONMENT=worker,node -sMODULARIZE=1 -sEXPORT_NAME=createModuleSimulator
+        -sEXPORTED_FUNCTIONS=_malloc,_free -sEXPORTED_RUNTIME_METHODS=HEAPU8
+        "SHELL:--embed-file ${ptx_config}@/gpgpusim.config")
+endif()

@@ -219,3 +219,78 @@ index 6434dea..7c6c9d6 100644
                              mem_access_sector_mask_t mask);
  
    class memory_sub_partition *get_sub_partition(int sub_partition_id) {
+diff --git a/src/cuda-sim/instructions.cc b/src/cuda-sim/instructions.cc
+index f6324fb..5a5645e 100644
+--- a/src/cuda-sim/instructions.cc
++++ b/src/cuda-sim/instructions.cc
+@@ -1940,21 +1940,21 @@ void mma_impl(const ptx_instruction *pI, core_t *core, warp_inst_t inst) {
+         }
+         printf("\n");
+       }
+-      ptx_reg_t nw_v[16];
+-      int hex_val;
++      half nw_v[16];
++      unsigned short bits;
+ 
+       if (!((operand_num == 3) && (type2 == F32_TYPE))) {
+         for (k = 0; k < 2 * nelem; k++) {
+           if (k % 2 == 1)
+-            hex_val = (v[k / 2].s64 & 0xffff);
++            bits = (v[k / 2].s64 & 0xffff);
+           else
+-            hex_val = ((v[k / 2].s64 & 0xffff0000) >> 16);
+-          nw_v[k].f16 = *(reinterpret_cast<half *>(hex_val));
++            bits = ((v[k / 2].s64 & 0xffff0000) >> 16);
++          std::memcpy(&nw_v[k], &bits, sizeof(bits));
+         }
+       }
+       if (!((operand_num == 3) && (type2 == F32_TYPE))) {
+         for (k = 0; k < 2 * nelem; k++) {
+-          temp = nw_v[k].f16;
++          temp = nw_v[k];
+           if (core->get_gpu()->gpgpu_ctx->debug_tensorcore)
+             printf("%.2f ", temp);
+         }
+@@ -1974,7 +1974,7 @@ void mma_impl(const ptx_instruction *pI, core_t *core, warp_inst_t inst) {
+             if (core->get_gpu()->gpgpu_ctx->debug_tensorcore)
+               printf("A:thread=%d,row=%d,col=%d,offset=%d\n", thrd, row, col,
+                      offset);
+-            matrix_a[row][col] = nw_v[offset];
++            matrix_a[row][col].f16 = nw_v[offset];
+           }
+           break;
+         case 2:  // operand 2
+@@ -1983,7 +1983,7 @@ void mma_impl(const ptx_instruction *pI, core_t *core, warp_inst_t inst) {
+             if (core->get_gpu()->gpgpu_ctx->debug_tensorcore)
+               printf("B:thread=%d,row=%d,col=%d,offset=%d\n", thrd, row, col,
+                      offset);
+-            matrix_b[row][col] = nw_v[offset];
++            matrix_b[row][col].f16 = nw_v[offset];
+           }
+           break;
+         case 3:  // operand 3
+@@ -1995,7 +1995,7 @@ void mma_impl(const ptx_instruction *pI, core_t *core, warp_inst_t inst) {
+             if (type2 != F16_TYPE) {
+               matrix_c[row][col] = v[offset];
+             } else {
+-              matrix_c[row][col] = nw_v[offset];
++              matrix_c[row][col].f16 = nw_v[offset];
+             }
+           }
+           break;
+@@ -2042,6 +2042,15 @@ void mma_impl(const ptx_instruction *pI, core_t *core, warp_inst_t inst) {
+ 
+   for (i = 0; i < 16; i++) {
+     for (j = 0; j < 16; j++) {
++      if (type == F32_TYPE && type2 == F32_TYPE) {
++        float sum = matrix_c[i][j].f32;
++        for (k = 0; k < 16; k++) {
++          sum += static_cast<float>(matrix_a[i][k].f16) *
++                 static_cast<float>(matrix_b[k][j].f16);
++        }
++        matrix_d[i][j].f32 = sum;
++        continue;
++      }
+       for (k = 0; k < 16; k++) {
+         matrix_d[i][j].f16 =
+             matrix_d[i][j].f16 + matrix_a[i][k].f16 * matrix_b[k][j].f16;

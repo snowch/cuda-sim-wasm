@@ -8,12 +8,13 @@ const values = document.querySelector('#values');
 const ptxPanel = document.querySelector('#ptx-panel');
 const ptx = document.querySelector('#ptx');
 const mode = document.documentElement.dataset.inline || new URLSearchParams(location.search).get('embed');
+const advanced = Boolean(lab.programs && Object.hasOwn(lab.programs, mode));
 const profile = mode === 'hello' ? 'hello' : undefined;
 const fullProgram = document.documentElement.dataset.program === 'true';
 const consoleOutput = document.querySelector('#program-output');
 const operations = document.querySelector('#program-operations');
 if (fullProgram) {
-  editor.value = profile ? lab.firstProgram : mode === 'coalescing' ? lab.coalescingProgram : lab.arrayProgram;
+  editor.value = advanced ? lab.programs[mode] : profile ? lab.firstProgram : mode === 'coalescing' ? lab.coalescingProgram : lab.arrayProgram;
   document.querySelector('#output-title + p').textContent = 'Output from main() in this browser.';
   values.closest('table').hidden = true;
   consoleOutput.hidden = false;
@@ -26,7 +27,7 @@ if (fullProgram) {
 }
 const starter = editor.value;
 const storageKey = 'gpu-lab-v2:editable-cuda-kernel' +
-  (['hello', 'scale', 'bounds', 'copies', 'coalescing'].includes(mode) ? mode : '') + (fullProgram ? ':program' : '');
+  (advanced || ['hello', 'scale', 'bounds', 'copies', 'coalescing'].includes(mode) ? mode : '') + (fullProgram ? ':program' : '');
 let engine;
 let workerUrl;
 let prepared = false;
@@ -141,13 +142,29 @@ run.addEventListener('click', () => {
       shutDown();
       fail('The run timed out.');
     }, 90_000);
-    engine.postMessage({ source: editor.value, profile, fullProgram, assets: prepared ? undefined : lab.assets });
+    let assets;
+    if (!prepared) {
+      assets = { compiler: lab.assets.compiler };
+      if (advanced) assets.advanced = lab.assets.advanced;
+      else assets.simulator = lab.assets.simulator;
+      if (advanced && assets.advanced?.files) {
+        const base = document.querySelector('meta[name="gpu-base"]')?.content || '../';
+        const release = document.querySelector('meta[name="gpu-release"]')?.content;
+        const folder = base + (release ? 'releases/' + release + '/' : '') + 'assets/cuda-workbench/';
+        assets.advanced = Object.fromEntries(Object.entries(assets.advanced.files).map(([name, asset]) => [
+          name, { ...asset, parts: asset.parts.map(part => new URL(folder + part, location.href).href) },
+        ]));
+      }
+    }
+    engine.postMessage({ source: editor.value, profile, fullProgram, advanced, assets });
   } catch (error) {
     shutDown();
     fail('The compiler could not start.', String(error.message ?? error));
   }
 });
 
+// Release the compiled toolchain when this lesson's iframe goes away.
+addEventListener('pagehide', shutDown);
 stop.addEventListener('click', () => {
   shutDown();
   clearResult('Run stopped. Your source is ready to edit.');

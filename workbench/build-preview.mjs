@@ -36,12 +36,26 @@ const assets = {
     wasm: compressed(await readFile(join(simulatorDir, 'run-ptx.wasm'))),
   },
 };
+const moduleDir = process.env.WORKBENCH_MODULE_DIR;
+let moduleRuntime = '';
+if (moduleDir) {
+  const files = JSON.parse(await readFile(join(moduleDir, 'manifest.json'), 'utf8'));
+  assets.advanced = online ? { files } : Object.fromEntries(await Promise.all(
+    Object.entries(files).map(async ([name, { parts, sha256 }]) => [
+      name, { sha256, gzip: Buffer.concat(await Promise.all(parts.map(file => readFile(join(moduleDir, file))))).toString('base64') },
+    ]),
+  ));
+  const scripts = await Promise.all(['device.mjs', 'module-host.mjs'].map(read));
+  moduleRuntime = 'const matrixHeader = ' + JSON.stringify(await read('./mma.h')) + ';\n' +
+    'const moduleRuntime = (() => {\n' + scripts.join('\n').replace(/^export /gm, '').replace(/^import .*\n/gm, '') +
+    '\nreturn { installHeaders, compileHost, runProgram, ptxDevice };\n})();';
+}
 const pipeline = (await read('./pipeline.mjs')).replace(/^export /gm, '');
 const program = (await read('./program.mjs')).replace(/^export /gm, '');
 const worker = (await read('./worker.mjs')).replace(/^import .*\n/gm, '');
-const lab = { assets, worker: [pipeline, program, worker].join('\n') };
+const lab = { assets, worker: [pipeline, program, moduleRuntime, worker].join('\n') };
 const firstKernel = await read('./first-kernel.cu');
-const js = 'const lab = ' + JSON.stringify({ ...lab, firstKernel, firstProgram: await read('./first-program.cu'), arrayProgram: await read('./program.cu'), coalescingProgram: await read('./coalescing.cu') }) + ';\n' + await read('./page.js');
+const js = 'const lab = ' + JSON.stringify({ ...lab, firstKernel, firstProgram: await read('./first-program.cu'), arrayProgram: await read('./program.cu'), coalescingProgram: await read('./coalescing.cu') }) + ';\nlab.programs = /* architecture-programs */ {};\n' + await read('./page.js');
 const starter = await read('./hello.cu');
 const html = (await read('./index.html'))
   .replace('__STARTER__', () => escape(starter))
