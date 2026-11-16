@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Edit a CUDA kernel · GPU Lab V2</title>
+<style>
+:root{color-scheme:light;--bg:#f4f8f7;--surface:#fff;--ink:#172f35;--muted:#49636b;--line:#cad9d9;--accent:#09674f;--on:#fff;--soft:#e8f3ee;--code:#122824;--code-ink:#effaf3;--alarm:#a33224;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#122225;--surface:#1b3034;--ink:#ecf6f2;--muted:#b3c9cb;--line:#3f5b5e;--accent:#a4ead0;--on:#122225;--soft:#223f3b;--code:#0d1e1b;--code-ink:#effaf3;--alarm:#ffaea2}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,sans-serif}
+main{width:min(1120px,100%);margin:auto;padding:clamp(18px,4.5vw,54px)}
+p,h1,h2,h3{margin:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{color:var(--accent);font-size:.8rem;font-weight:750;letter-spacing:.12em}
+a{color:var(--accent);text-underline-offset:3px}
+h1{margin:8px 0 10px;font-size:clamp(2.25rem,5vw,3.8rem);line-height:1.06;letter-spacing:-.05em}
+h2{font-size:1.14rem}
+.lede,.sub,.note{color:var(--muted)}
+.lede{max-width:65ch}
+.task{margin:24px 0 16px;background:var(--soft);border-left:3px solid var(--accent);border-radius:0 7px 7px 0;padding:10px 14px}
+.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
+.card{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:clamp(12px,2vw,20px)}
+.editor-label{display:flex;gap:8px;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.editor-label span{color:var(--muted);font-size:.8rem}
+textarea{display:block;width:100%;min-height:286px;resize:vertical;white-space:pre;overflow:auto;border:1px solid var(--line);border-radius:7px;background:var(--code);color:var(--code-ink);padding:12px;font:15px/1.55 var(--mono);tab-size:4}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+button{border:1px solid var(--line);border-radius:6px;padding:7px 11px;background:var(--surface);color:var(--ink);font:600 .9rem/1.45 system-ui,sans-serif;min-height:44px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--on);border-color:var(--accent)}
+button:disabled{opacity:.65;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.sub,.note{font-size:.86rem}
+.note{margin-top:10px}
+#status{margin-top:12px;min-height:1.7em;color:var(--accent);font-weight:650}
+#status[data-error="true"]{color:var(--alarm)}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+tbody td{font-family:var(--mono)}
+th:first-child{text-align:left}
+tbody td:last-child{color:var(--accent);font-weight:700}
+details{margin-top:14px}
+summary{cursor:pointer;font-weight:650}
+pre{border:1px solid var(--line);border-radius:6px;padding:10px;background:var(--soft);font:.81rem/1.55 var(--mono);overflow:auto;max-height:340px;white-space:pre-wrap;overflow-wrap:anywhere}
+#diagnostics{color:var(--alarm)}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.top a{font-size:.8rem}textarea{font-size:14px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="top"><p class="brand">GPU LAB V2</p>__COURSE_LINK__</div>
+<h1>Edit a CUDA kernel</h1>
+<p class="lede">Compile your edited kernel to PTX and see the values GPGPU-Sim writes. Compilation and execution happen in this browser.</p>
+</header>
+<p class="task"><strong>Try it.</strong> Change <code>2.0f</code> to <code>3.0f</code>. Predict the value at index 2, then compile and run. Try adding <code>+ 1.0f</code> to the expression and run again.</p>
+<div class="grid">
+<section class="card" aria-labelledby="editor-title">
+<div class="editor-label"><h2 id="editor-title"><label for="source">CUDA source</label></h2><span>Device kernel</span></div>
+<textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" rows="12">__STARTER__</textarea>
+<div class="controls">
+<button id="run" class="primary" type="button">Compile and run</button>
+<button id="stop" type="button" hidden>Stop</button>
+<button id="reset" type="button">Restore starter</button>
+</div>
+<p class="note">__ASSET_NOTE__</p>
+<p id="status" role="status">Edit the kernel, then compile and run.</p>
+<pre id="diagnostics" hidden aria-label="Compiler diagnostics"></pre>
+</section>
+<section class="card" aria-labelledby="output-title">
+<h2 id="output-title">Simulated output</h2>
+<p class="sub">The lesson launches two blocks of four threads and passes five input values.</p>
+<table aria-label="Input and simulated output values">
+<thead><tr><th scope="col">Index</th><th scope="col">Input</th><th scope="col">Output</th></tr></thead>
+<tbody id="values"></tbody>
+</table>
+<pre id="program-output" hidden aria-label="Program output" aria-live="polite"></pre>
+<details id="program-operations" hidden><summary>Trace CUDA calls</summary><pre></pre></details>
+<details id="ptx-panel" hidden><summary>Inspect generated PTX</summary><pre id="ptx"></pre></details>
+</section>
+</div>
+<details id="software-licences">
+<summary>Software licences</summary>
+<pre>__LICENSES__</pre>
+</details>
+</main>
+<script>/* __SCRIPT__ */</script>
+</body>
+</html>

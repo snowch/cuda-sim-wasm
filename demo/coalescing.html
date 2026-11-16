@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Memory coalescing | GPU Lab</title>
+<style>
+:root{color-scheme:dark;--page:#101923;--panel:#162330;--inset:#111d28;--line:#324351;--text:#ecf4f6;--muted:#adc1cc;--accent:#8aefd8;--ink:#10352e;--glow:#1b3441;--choice:#1a393b;--related:#243b49;--focus:#fff;--error:#ffbcb4;--mono:ui-monospace,SFMono-Regular,Consolas,monospace;font:16px/1.5 system-ui,sans-serif}
+*{box-sizing:border-box}
+@media(prefers-color-scheme:light){
+:root{color-scheme:light;--page:#edf3f6;--panel:#fff;--inset:#f3f7f9;--line:#c5d4da;--text:#162b37;--muted:#435c6b;--accent:#006954;--ink:#fff;--glow:#d4e9e6;--choice:#e4f4ef;--related:#e8f2f4;--focus:#193f50;--error:#9e352d}
+}
+body{margin:0;min-height:100vh;color:var(--text);background:radial-gradient(ellipse at 20% 0%,var(--glow),transparent 50%),var(--page)}
+main{width:min(1160px,100%);margin:auto;padding:clamp(1rem,3.5vw,2.75rem)}
+h1,h2,p,figure{margin:0}
+h1{font-size:clamp(2.25rem,5.5vw,4.1rem);line-height:1.06;letter-spacing:-.045em;margin:.3rem 0 .65rem}
+h2{font-size:1.13rem;letter-spacing:-.012em}
+.brand{font-size:.82rem;letter-spacing:.13em;font-weight:700;color:var(--accent)}
+.lede,.sub,.fine,figcaption{color:var(--muted)}
+header{margin-bottom:1.7rem}
+.controls{display:flex;flex-wrap:wrap;align-items:end;gap:1rem;justify-content:space-between;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem 1.15rem;margin-bottom:1rem}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+legend{color:var(--muted);font-size:.82rem;margin-bottom:.35rem}
+.choices{display:flex;flex-wrap:wrap;gap:.45rem}
+.choices input{position:absolute;opacity:0;width:1px;height:1px}
+.choices label{display:block;padding:.45rem .7rem;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-weight:630;font-size:.9rem}
+.choices input:checked+label{border-color:var(--accent);color:var(--accent);background:var(--choice)}
+.choices input:focus-visible+label,button:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+button{font:inherit;cursor:pointer}
+button:disabled,fieldset:disabled label{opacity:.65;cursor:wait}
+#run{padding:.59rem .95rem;border:1px solid var(--accent);border-radius:8px;color:var(--ink);background:var(--accent);font-weight:750}
+.views{display:grid;grid-template-columns:minmax(0,2.12fr) minmax(0,1fr);gap:1rem;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:clamp(.85rem,2.5vw,1.3rem)}
+.card .sub{font-size:.84rem;margin:.22rem 0 .9rem}
+.lanes{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:.35rem}
+.lane,.sector{min-width:0;color:var(--text);text-align:left;border:1px solid var(--line);background:var(--inset);border-radius:6px}
+.lane{display:grid;gap:.08rem;padding:.38rem .28rem;font-family:var(--mono);border-top:2px solid var(--group,var(--line))}
+.lane small{font:600 .72rem/1.25 system-ui,sans-serif;color:var(--muted)}
+.lane span{font-size:clamp(.65rem,.93vw,.82rem);white-space:nowrap}
+.lane[data-related="true"]{background:var(--related);border-color:var(--group,var(--muted))}
+.lane[aria-pressed="true"],.sector[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:-2px}
+.sector-head{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin:1.25rem 0 .55rem}
+#touched{color:var(--accent);font:700 .87rem/1 var(--mono);white-space:nowrap}
+.sectors{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:.32rem}
+.sector{padding:.28rem .33rem;font:600 .74rem/1.5 var(--mono);border-left:2px solid var(--group,var(--line));text-align:center}
+figcaption{padding-top:.7rem;font-size:.8rem;min-height:3rem}
+.metrics{display:grid;gap:.55rem;grid-template-columns:1fr 1fr;margin:.45rem 0 .75rem}
+.metric{padding:.52rem .65rem;background:var(--inset);border:1px solid var(--line);border-radius:8px}
+.metric strong{display:block;color:var(--accent);font:700 clamp(1.15rem,3vw,1.8rem)/1.2 var(--mono)}
+.metric span{font-size:.78rem;color:var(--muted)}
+#status{min-height:1.55rem;font-size:.83rem;color:var(--muted)}
+#status[data-error="true"]{color:var(--error)}
+h3{font-size:.87rem;margin:.8rem 0 .35rem}
+table{font-size:.77rem;border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:.31rem .15rem;border-bottom:1px solid var(--line);text-align:right}
+th{color:var(--muted);font-weight:600}
+th:first-child,td:first-child{text-align:left}
+.fine{font-size:.74rem;margin-top:.55rem}
+details{color:var(--muted);margin-top:1rem;font-size:.8rem}
+details pre{white-space:pre-wrap}
+[hidden]{display:none!important}
+@media(max-width:890px){.views{grid-template-columns:1fr}.lane span{font-size:.8rem}}
+@media(max-width:530px){.lanes{grid-template-columns:repeat(4,minmax(0,1fr))}.sectors{grid-template-columns:repeat(8,minmax(0,1fr))}.sector{padding:.25rem .1rem;font-size:.7rem}#run{width:100%}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<p class="brand">GPU LAB</p>
+<h1>Memory coalescing</h1>
+<p class="lede">See how the addresses in one warp affect the number of memory requests.</p>
+</header>
+<div class="controls">
+<fieldset id="stride">
+<legend>Byte stride between lanes</legend>
+<div class="choices">
+<input name="stride" type="radio" id="stride4" value="4" checked><label for="stride4">4 bytes · contiguous</label>
+<input name="stride" type="radio" id="stride128" value="128"><label for="stride128">128 bytes · strided</label>
+</div>
+</fieldset>
+<button id="run" type="button">Run simulation</button>
+</div>
+<div class="views">
+<figure class="card">
+<h2>Warp addresses</h2>
+<p class="sub">Each of the 32 lanes loads 4 bytes. Select a hex address to see which lanes share its sector.</p>
+<div class="lanes" id="lanes" role="group" aria-label="Warp lane addresses"></div>
+<div class="sector-head"><h2>32-byte memory sectors</h2><span id="touched"></span></div>
+<div class="sectors" id="sectors" role="group" aria-label="Touched memory sectors"></div>
+<figcaption id="selection" aria-live="polite"></figcaption>
+</figure>
+<section class="card" aria-labelledby="output-title">
+<h2 id="output-title">Simulation</h2>
+<p class="sub">Accel-Sim · A100 model</p>
+<div class="metrics">
+<div class="metric"><strong id="reads">—</strong><span>Global reads</span></div>
+<div class="metric"><strong id="cycles">—</strong><span>Simulated cycles</span></div>
+</div>
+<p id="status" role="status">Run the selected stride to see its counters.</p>
+<p id="comparison" class="fine" hidden></p>
+<div id="timing" hidden>
+<h3>Time on this device</h3>
+<table>
+<thead><tr><th scope="col">Run</th><th scope="col">Wasm setup</th><th scope="col">Sim init</th><th scope="col">Replay</th></tr></thead>
+<tbody id="timings"></tbody></table>
+<p class="fine" id="engine-time"></p>
+<p class="fine">Each run starts a fresh simulator instance. The worker keeps the compiled WebAssembly for reuse.</p>
+</div>
+</section>
+</div>
+<details><summary>Trace and software licenses</summary>
+<p>Two synthetic traces of one global load and an exit. Global reads count the model’s requests injected into the interconnect.</p>
+<pre>__LICENSES__</pre>
+</details>
+</main>
+<script>/* __DEMO_SCRIPT__ */</script>
+</body>
+</html>

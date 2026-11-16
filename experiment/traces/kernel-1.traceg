@@ -1,0 +1,18 @@
+-kernel name = coalesced_load
+-kernel id = 1
+-grid dim = (1,1,1)
+-block dim = (32,1,1)
+-shmem = 0
+-nregs = 8
+-cuda stream id = 0
+-binary version = 80
+-accelsim tracer version = 3
+-enable lineinfo = 0
+# trace records
+#BEGIN_TB
+thread block = 0,0,0
+warp = 0
+insts = 2
+0 ffffffff 1 R2 LDG.E 1 R4 4 1 10000000 4 0
+10 ffffffff 0 EXIT 0 0 0
+#END_TB
